@@ -1,0 +1,8 @@
+{
+    "files.associations": {
+        "stm32f1xx_hal.h": "c",
+        "stdint.h": "c",
+        "cmsis_compiler.h": "c",
+        "newlib.h": "c"
+    }
+}
