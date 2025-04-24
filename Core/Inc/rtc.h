@@ -1,9 +1,9 @@
 /* USER CODE BEGIN Header */
 /**
   ******************************************************************************
-  * @file    spi.h
+  * @file    rtc.h
   * @brief   This file contains all the function prototypes for
-  *          the spi.c file
+  *          the rtc.c file
   ******************************************************************************
   * @attention
   *
@@ -18,8 +18,8 @@
   */
 /* USER CODE END Header */
 /* Define to prevent recursive inclusion -------------------------------------*/
-#ifndef __SPI_H__
-#define __SPI_H__
+#ifndef __RTC_H__
+#define __RTC_H__
 
 #ifdef __cplusplus
 extern "C" {
@@ -29,24 +29,30 @@ extern "C" {
 #include "main.h"
 
 /* USER CODE BEGIN Includes */
-
+#include <time.h>
+#include <stdio.h>
+#include <string.h>
 /* USER CODE END Includes */
 
-extern SPI_HandleTypeDef hspi1;
+extern RTC_HandleTypeDef hrtc;
 
 /* USER CODE BEGIN Private defines */
-
+#define BUILD_DATE __DATE__
+#define BUILD_TIME __TIME__
 /* USER CODE END Private defines */
 
-void MX_SPI1_Init(void);
+void MX_RTC_Init(void);
 
 /* USER CODE BEGIN Prototypes */
-
+int Get_Month_Number(const char* monthStr);
+RTC_DateTypeDef Get_Build_Date();
+RTC_TimeTypeDef Get_Build_TIME();
+void Set_RTC_Start_Time(RTC_DateTypeDef midDate, RTC_TimeTypeDef midTime);
 /* USER CODE END Prototypes */
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* __SPI_H__ */
+#endif /* __RTC_H__ */
 
