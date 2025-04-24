@@ -1,0 +1,2 @@
+# STM32F103C8T6_HAL_CMake
+这是一个使用hal的基础示例
