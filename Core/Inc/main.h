@@ -31,7 +31,7 @@ extern "C" {
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include <stdio.h>
 /* USER CODE END Includes */
 
 /* Exported types ------------------------------------------------------------*/
@@ -59,7 +59,12 @@ void Error_Handler(void);
 /* Private defines -----------------------------------------------------------*/
 
 /* USER CODE BEGIN Private defines */
-
+#ifdef DEBUG
+#define LOG_D(fmt, ...) printf(fmt, ##__VA_ARGS__)
+#else
+#define LOG_BUFFER_SIZE 0
+#define LOG_D(fmt, ...)
+#endif
 /* USER CODE END Private defines */
 
 #ifdef __cplusplus
