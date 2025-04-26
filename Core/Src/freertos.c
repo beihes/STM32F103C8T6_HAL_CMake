@@ -49,6 +49,7 @@
 /* USER CODE BEGIN Variables */
 RTC_DateTypeDef rtcDate;
 RTC_TimeTypeDef rtcTime;
+AppDevice appDevice;
 /* USER CODE END Variables */
 /* Definitions for ledTask */
 osThreadId_t ledTaskHandle;
@@ -57,10 +58,10 @@ const osThreadAttr_t ledTask_attributes = {
   .stack_size = 128 * 4,
   .priority = (osPriority_t) osPriorityNormal,
 };
-/* Definitions for wlanTask */
-osThreadId_t wlanTaskHandle;
-const osThreadAttr_t wlanTask_attributes = {
-  .name = "wlanTask",
+/* Definitions for wifiTask */
+osThreadId_t wifiTaskHandle;
+const osThreadAttr_t wifiTask_attributes = {
+  .name = "wifiTask",
   .stack_size = 128 * 4,
   .priority = (osPriority_t) osPriorityNormal2,
 };
@@ -76,7 +77,7 @@ const osMessageQueueAttr_t myLEDQueue_attributes = {
 /* USER CODE END FunctionPrototypes */
 
 void StartLED_Task(void *argument);
-void StartWlan_Task(void *argument);
+void StartWifi_Task(void *argument);
 
 void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
 
@@ -85,11 +86,22 @@ void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
   * @param  None
   * @retval None
   */
-void MX_FREERTOS_Init(void) {
-  /* USER CODE BEGIN Init */
+void MX_FREERTOS_Init(void)
+{
+    /* USER CODE BEGIN Init */
     rtcDate = Get_Build_Date();
     rtcTime = Get_Build_TIME();
     Set_RTC_Start_Time(rtcDate, rtcTime);
+#ifdef USE_USART1_NORMAL
+    HAL_UART_Receive_IT(usart1_rx.huart, &usart1_rx.ch, 1);    // 打开接收等相关中断
+#endif 
+#ifdef USE_USART2_NORMAL
+    HAL_UART_Receive_IT(usart2_rx.huart, &usart2_rx.ch, 1);    // 打开接收等相关中断
+#endif 
+#ifdef USE_USART3_NORMAL
+    HAL_UART_Receive_IT(usart3_rx.huart, &usart3_rx.ch, 1);    // 打开接收等相关中断
+#endif 
+    Wifi_ConnectComputer();
   /* USER CODE END Init */
 
   /* USER CODE BEGIN RTOS_MUTEX */
@@ -106,26 +118,26 @@ void MX_FREERTOS_Init(void) {
 
   /* Create the queue(s) */
   /* creation of myLEDQueue */
-  myLEDQueueHandle = osMessageQueueNew (16, sizeof(uint16_t), &myLEDQueue_attributes);
+    myLEDQueueHandle = osMessageQueueNew(16, sizeof(uint16_t), &myLEDQueue_attributes);
 
-  /* USER CODE BEGIN RTOS_QUEUES */
-        /* add queues, ... */
-  /* USER CODE END RTOS_QUEUES */
+    /* USER CODE BEGIN RTOS_QUEUES */
+          /* add queues, ... */
+    /* USER CODE END RTOS_QUEUES */
 
-  /* Create the thread(s) */
-  /* creation of ledTask */
-  ledTaskHandle = osThreadNew(StartLED_Task, NULL, &ledTask_attributes);
+    /* Create the thread(s) */
+    /* creation of ledTask */
+    ledTaskHandle = osThreadNew(StartLED_Task, NULL, &ledTask_attributes);
 
-  /* creation of wlanTask */
-  wlanTaskHandle = osThreadNew(StartWlan_Task, NULL, &wlanTask_attributes);
+    /* creation of wifiTask */
+    wifiTaskHandle = osThreadNew(StartWifi_Task, NULL, &wifiTask_attributes);
 
-  /* USER CODE BEGIN RTOS_THREADS */
-        /* add threads, ... */
-  /* USER CODE END RTOS_THREADS */
+    /* USER CODE BEGIN RTOS_THREADS */
+          /* add threads, ... */
+    /* USER CODE END RTOS_THREADS */
 
-  /* USER CODE BEGIN RTOS_EVENTS */
-        /* add events, ... */
-  /* USER CODE END RTOS_EVENTS */
+    /* USER CODE BEGIN RTOS_EVENTS */
+          /* add events, ... */
+    /* USER CODE END RTOS_EVENTS */
 
 }
 
@@ -136,9 +148,9 @@ void MX_FREERTOS_Init(void) {
 * @retval None
 */
 /* USER CODE END Header_StartLED_Task */
-void StartLED_Task(void* argument)
+void StartLED_Task(void *argument)
 {
-    /* USER CODE BEGIN StartLED_Task */
+  /* USER CODE BEGIN StartLED_Task */
         /* Infinite loop */
     HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_RESET);
     for (;;) {
@@ -150,28 +162,32 @@ void StartLED_Task(void* argument)
         HAL_RTC_GetTime(&hrtc, &rtcTime, RTC_FORMAT_BIN);
         HAL_RTC_GetDate(&hrtc, &rtcDate, RTC_FORMAT_BIN);
         /* Display date Format : yy/mm/dd */
-        LOG_D("%02d/%02d/%02d%3d", 2000 + rtcDate.Year, rtcDate.Month, rtcDate.Date, rtcDate.WeekDay);
+        // LOG_D("%02d/%02d/%02d%3d", 2000 + rtcDate.Year, rtcDate.Month, rtcDate.Date, rtcDate.WeekDay);
         /* Display time Format : hh:mm:ss */
-        LOG_D("\t%02d:%02d:%02d\r\n", rtcTime.Hours, rtcTime.Minutes, rtcTime.Seconds);
+        // LOG_D("\t%02d:%02d:%02d\r\n", rtcTime.Hours, rtcTime.Minutes, rtcTime.Seconds);
     }
-    /* USER CODE END StartLED_Task */
+  /* USER CODE END StartLED_Task */
 }
 
-/* USER CODE BEGIN Header_StartWlan_Task */
+/* USER CODE BEGIN Header_StartWifi_Task */
 /**
-* @brief Function implementing the wlanTask thread.
+* @brief Function implementing the wifiTask thread.
 * @param argument: Not used
 * @retval None
 */
-/* USER CODE END Header_StartWlan_Task */
-void StartWlan_Task(void *argument)
+/* USER CODE END Header_StartWifi_Task */
+void StartWifi_Task(void *argument)
 {
-  /* USER CODE BEGIN StartWlan_Task */
-        /* Infinite loop */
+  /* USER CODE BEGIN StartWifi_Task */
+    /* Infinite loop */
+    char midStr[64] = "";
+    int length = 0;
     for (;;) {
-        osDelay(1);
+        osDelay(1000);
+        length = sprintf(midStr, "%02d:%02d:%02d\r\n", rtcTime.Hours, rtcTime.Minutes, rtcTime.Seconds);
+        EspSendData(midStr, length);
     }
-  /* USER CODE END StartWlan_Task */
+  /* USER CODE END StartWifi_Task */
 }
 
 /* Private application code --------------------------------------------------*/

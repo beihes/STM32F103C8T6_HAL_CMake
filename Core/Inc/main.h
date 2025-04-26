@@ -31,6 +31,7 @@ extern "C" {
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include <stdbool.h>
 #include <stdio.h>
 /* USER CODE END Includes */
 
@@ -65,6 +66,21 @@ void Error_Handler(void);
 #define LOG_BUFFER_SIZE 0
 #define LOG_D(fmt, ...)
 #endif
+
+typedef struct AppDeviceData
+{
+    uint16_t id;
+    uint8_t isWook;
+}AppDeviceData;
+
+typedef struct AppDevice
+{
+    float u;
+    float i;
+    float p;
+    AppDeviceData data[10];
+}AppDevice;
+
 /* USER CODE END Private defines */
 
 #ifdef __cplusplus
