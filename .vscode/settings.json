@@ -5,6 +5,7 @@
         "cmsis_compiler.h": "c",
         "newlib.h": "c",
         "string.h": "c",
-        "usart.h": "c"
+        "usart.h": "c",
+        "cstdint": "c"
     }
 }

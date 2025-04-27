@@ -43,8 +43,8 @@ extern UART_HandleTypeDef huart3;
 
 /* USER CODE BEGIN Private defines */
 #define USE_USART1_NORMAL
-#define USE_USART2_NORMAL
-// #define USE_USART3_NORMAL
+// #define USE_USART2_NORMAL
+#define USE_USART3_NORMAL
 typedef struct __USART_RX
 {
     uint8_t rxbuf[128];    // 数据缓冲区
@@ -64,24 +64,24 @@ extern stu_usart_rx usart2_rx;
 extern stu_usart_rx usart3_rx;
 #endif 
 // #define USE_USART1_DMA_RX
-// #define USE_USART2_DMA_RX
+#define USE_USART2_DMA
 // #define USE_USART3_DMA_RX
 #define BUFFERSIZE 		255				// 缓冲区大小
 typedef struct _USART_DMA_
 {
-    bool 	 recv_end_flag;				// 接收完成标志
-    uint8_t  send_buf[BUFFERSIZE];		// 发送缓冲区
-    uint8_t  recv_buf[BUFFERSIZE];		// 接收缓冲区
-    uint8_t  dma_buf[BUFFERSIZE];		// dma缓冲区
-    uint16_t recv_len;					// 接收数据的长度
+    bool 	 recvEndFlag;				// 接收完成标志
+    uint8_t  sendBuf[BUFFERSIZE];		// 发送缓冲区
+    uint8_t  recvBuf[BUFFERSIZE];		// 接收缓冲区
+    uint8_t  dmaBuf[BUFFERSIZE];		// dma缓冲区
+    uint16_t recvLength;				// 接收数据的长度
 } stu_usart_DMA;
 
 #ifdef USE_USART1_DMA_RX
 extern stu_usart_DMA usart1_dma;
 #endif
 
-#ifdef USE_USART3_DMA_RX
-extern stu_usart_DMA usart3_dma;
+#ifdef USE_USART2_DMA
+extern stu_usart_DMA usart2_dma;
 #endif
 
 #ifdef USE_USART3_DMA_RX
@@ -100,7 +100,12 @@ void USART1_DMA_Send(uint8_t* buffer, uint16_t length);
 void Debug_printf(const char* format, ...);
 #endif
 
+#ifdef USE_USART2_DMA
+void USART2_DMA_Send(const uint8_t* buffer, uint16_t length);
+#endif
+
 void Esp_Printf(const char* format, ...);
+void Set_stu_usart_rx_NULL(stu_usart_rx* data);
 
 uint8_t EspSendCmdAndCheckRecvData(const char* cmd, const char* recCmd, uint32_t outTime);
 
@@ -111,9 +116,11 @@ uint8_t EspSendCmdAndCheckRecvData(const char* cmd, const char* recCmd, uint32_t
    */
 void Wifi_ConnectComputer();
 
-uint8_t EspSendData(const char* data, uint32_t length);
+uint8_t EspSendData(const char* data, uint16_t length);
 
 uint8_t EspOutCIPMODE();
+
+void USART3_Printf(const char* format, ...);
 /* USER CODE END Prototypes */
 
 #ifdef __cplusplus

@@ -57,6 +57,8 @@
 /* USER CODE END 0 */
 
 /* External variables --------------------------------------------------------*/
+extern DMA_HandleTypeDef hdma_usart2_rx;
+extern DMA_HandleTypeDef hdma_usart2_tx;
 extern UART_HandleTypeDef huart1;
 extern UART_HandleTypeDef huart2;
 extern TIM_HandleTypeDef htim1;
@@ -164,6 +166,34 @@ void DebugMon_Handler(void)
 /******************************************************************************/
 
 /**
+  * @brief This function handles DMA1 channel6 global interrupt.
+  */
+void DMA1_Channel6_IRQHandler(void)
+{
+  /* USER CODE BEGIN DMA1_Channel6_IRQn 0 */
+
+  /* USER CODE END DMA1_Channel6_IRQn 0 */
+  HAL_DMA_IRQHandler(&hdma_usart2_rx);
+  /* USER CODE BEGIN DMA1_Channel6_IRQn 1 */
+
+  /* USER CODE END DMA1_Channel6_IRQn 1 */
+}
+
+/**
+  * @brief This function handles DMA1 channel7 global interrupt.
+  */
+void DMA1_Channel7_IRQHandler(void)
+{
+  /* USER CODE BEGIN DMA1_Channel7_IRQn 0 */
+
+  /* USER CODE END DMA1_Channel7_IRQn 0 */
+  HAL_DMA_IRQHandler(&hdma_usart2_tx);
+  /* USER CODE BEGIN DMA1_Channel7_IRQn 1 */
+
+  /* USER CODE END DMA1_Channel7_IRQn 1 */
+}
+
+/**
   * @brief This function handles TIM1 update interrupt.
   */
 void TIM1_UP_IRQHandler(void)
@@ -182,7 +212,7 @@ void TIM1_UP_IRQHandler(void)
   */
 void USART1_IRQHandler(void)
 {
-    /* USER CODE BEGIN USART1_IRQn 0 */
+  /* USER CODE BEGIN USART1_IRQn 0 */
 #ifdef USE_USART1_DMA_RX
     uint16_t temp;
     if (huart1.Instance == USART1) {
@@ -195,21 +225,21 @@ void USART1_IRQHandler(void)
             // 读取 CNDTR 寄存器，获取 DMA 中未传输的数据个数
             temp = __HAL_DMA_GET_COUNTER(&hdma_usart1_rx);
             // 获得接收数据的长度（缓冲区总长度 - 未传输的数据个数）
-            usart1_dma.recv_len = BUFFERSIZE - temp;
+            usart1_dma.recvLength = BUFFERSIZE - temp;
             // 将已接收到的数据进行拷贝，防止数据覆盖造成丢失
-            memcpy(usart1_dma.recv_buf, usart1_dma.dma_buf, usart1_dma.recv_len);
+            memcpy(usart1_dma.recvBuf, usart1_dma.dmaBuf, usart1_dma.recvLength);
             // 接收完成标志置位
-            usart1_dma.recv_end_flag = 1;
+            usart1_dma.recvEndFlag = 1;
             // 因为前面停止了 DMA 传输，现在要重新打开（这个视个人需求而定要不要重新打开）
-            while (HAL_UART_Receive_DMA(&huart1, usart1_dma.dma_buf, BUFFERSIZE) != HAL_OK);
+            while (HAL_UART_Receive_DMA(&huart1, usart1_dma.dmaBuf, BUFFERSIZE) != HAL_OK);
         }
     }
 #endif
-    /* USER CODE END USART1_IRQn 0 */
-    HAL_UART_IRQHandler(&huart1);
-    /* USER CODE BEGIN USART1_IRQn 1 */
+  /* USER CODE END USART1_IRQn 0 */
+  HAL_UART_IRQHandler(&huart1);
+  /* USER CODE BEGIN USART1_IRQn 1 */
 
-    /* USER CODE END USART1_IRQn 1 */
+  /* USER CODE END USART1_IRQn 1 */
 }
 
 /**
@@ -218,7 +248,36 @@ void USART1_IRQHandler(void)
 void USART2_IRQHandler(void)
 {
   /* USER CODE BEGIN USART2_IRQn 0 */
-
+#ifdef USE_USART2_DMA
+    uint16_t temp;
+    if (huart2.Instance == USART2) {
+        // 如果串口接收完一帧数据，处于空闲状态（IDLE 中断已置位）
+        if (__HAL_UART_GET_FLAG(&huart2, UART_FLAG_IDLE) != RESET) {
+            // 重置 IDLE 位（读取 SR 和 DR 寄存器后即可重置）
+            __HAL_UART_CLEAR_IDLEFLAG(&huart2);
+            // 停止 DMA 传输，因为不停止的话拷贝数据起来就会容易造成数据缺失
+            HAL_UART_DMAStop(&huart2);
+            // 读取 CNDTR 寄存器，获取 DMA 中未传输的数据个数
+            temp = __HAL_DMA_GET_COUNTER(&hdma_usart2_rx);
+            // 获得接收数据的长度（缓冲区总长度 - 未传输的数据个数）
+            usart2_dma.recvLength = BUFFERSIZE - temp;
+            // 将已接收到的数据进行拷贝，防止数据覆盖造成丢失
+            memcpy(usart2_dma.recvBuf, usart2_dma.dmaBuf, usart2_dma.recvLength);
+            if (usart2_dma.recvLength<BUFFERSIZE)
+            {
+                usart2_dma.recvBuf[usart2_dma.recvLength] = '\0';
+            }
+            else {
+                usart2_dma.recvBuf[BUFFERSIZE - 1] = '\0';
+            }
+            
+            // 接收完成标志置位
+            usart2_dma.recvEndFlag = 1;
+            // 因为前面停止了 DMA 传输，现在要重新打开（这个视个人需求而定要不要重新打开）
+            while (HAL_UART_Receive_DMA(&huart2, usart2_dma.dmaBuf, BUFFERSIZE) != HAL_OK);
+        }
+    }
+#endif
   /* USER CODE END USART2_IRQn 0 */
   HAL_UART_IRQHandler(&huart2);
   /* USER CODE BEGIN USART2_IRQn 1 */
