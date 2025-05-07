@@ -66,7 +66,7 @@ elseif("${CMAKE_BUILD_TYPE}" STREQUAL "MinSizeRel")
 else()
     message(VERBOSE "Minimal optimization, debug info included")
     add_compile_options(-Og -g)
-    add_definitions(-DDEBUG -DUSE_HAL_DRIVER)
+    # add_definitions(-DDEBUG -DUSE_HAL_DRIVER)
 endif()
 
 add_compile_options(-Wall)

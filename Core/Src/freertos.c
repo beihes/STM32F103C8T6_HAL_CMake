@@ -25,6 +25,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include "adc.h"
 #include "rtc.h"
 #include "usart.h"
 #include <string.h>
@@ -50,7 +51,9 @@
 /* USER CODE BEGIN Variables */
 RTC_DateTypeDef rtcDate;
 RTC_TimeTypeDef rtcTime;
+uint32_t ledLightNum = 0;
 AppDevice appDevice;
+float Vrms, Irms, P, PF, F, W;
 /* USER CODE END Variables */
 /* Definitions for ledTask */
 osThreadId_t ledTaskHandle;
@@ -63,20 +66,8 @@ const osThreadAttr_t ledTask_attributes = {
 osThreadId_t wifiTaskHandle;
 const osThreadAttr_t wifiTask_attributes = {
   .name = "wifiTask",
-  .stack_size = 256 * 4,
-  .priority = (osPriority_t) osPriorityRealtime,
-};
-/* Definitions for soundTask */
-osThreadId_t soundTaskHandle;
-const osThreadAttr_t soundTask_attributes = {
-  .name = "soundTask",
   .stack_size = 128 * 4,
-  .priority = (osPriority_t) osPriorityAboveNormal1,
-};
-/* Definitions for myLEDQueue */
-osMessageQueueId_t myLEDQueueHandle;
-const osMessageQueueAttr_t myLEDQueue_attributes = {
-  .name = "myLEDQueue"
+  .priority = (osPriority_t) osPriorityRealtime,
 };
 
 /* Private function prototypes -----------------------------------------------*/
@@ -86,7 +77,6 @@ const osMessageQueueAttr_t myLEDQueue_attributes = {
 
 void StartLED_Task(void *argument);
 void StartWifi_Task(void *argument);
-void StartSound_Task(void *argument);
 
 void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
 
@@ -113,23 +103,19 @@ void MX_FREERTOS_Init(void) {
   /* USER CODE END Init */
 
   /* USER CODE BEGIN RTOS_MUTEX */
-        /* add mutexes, ... */
+          /* add mutexes, ... */
   /* USER CODE END RTOS_MUTEX */
 
   /* USER CODE BEGIN RTOS_SEMAPHORES */
-        /* add semaphores, ... */
+          /* add semaphores, ... */
   /* USER CODE END RTOS_SEMAPHORES */
 
   /* USER CODE BEGIN RTOS_TIMERS */
-        /* start timers, add new ones, ... */
+          /* start timers, add new ones, ... */
   /* USER CODE END RTOS_TIMERS */
 
-  /* Create the queue(s) */
-  /* creation of myLEDQueue */
-  myLEDQueueHandle = osMessageQueueNew (16, sizeof(uint16_t), &myLEDQueue_attributes);
-
   /* USER CODE BEGIN RTOS_QUEUES */
-          /* add queues, ... */
+            /* add queues, ... */
   /* USER CODE END RTOS_QUEUES */
 
   /* Create the thread(s) */
@@ -139,15 +125,12 @@ void MX_FREERTOS_Init(void) {
   /* creation of wifiTask */
   wifiTaskHandle = osThreadNew(StartWifi_Task, NULL, &wifiTask_attributes);
 
-  /* creation of soundTask */
-  soundTaskHandle = osThreadNew(StartSound_Task, NULL, &soundTask_attributes);
-
   /* USER CODE BEGIN RTOS_THREADS */
-          /* add threads, ... */
+            /* add threads, ... */
   /* USER CODE END RTOS_THREADS */
 
   /* USER CODE BEGIN RTOS_EVENTS */
-          /* add events, ... */
+            /* add events, ... */
   /* USER CODE END RTOS_EVENTS */
 
 }
@@ -162,20 +145,16 @@ void MX_FREERTOS_Init(void) {
 void StartLED_Task(void *argument)
 {
   /* USER CODE BEGIN StartLED_Task */
-        /* Infinite loop */
+            /* Infinite loop */
     HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_RESET);
-    uint32_t ledLightNum = 0;
     for (;;) {
         HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_SET);
         ledLightNum++;
-        if (osMessageQueuePut(myLEDQueueHandle, &ledLightNum, 0, 0) == osOK) {
-            LOG_D("Message sent to LED queue: %ld", ledLightNum);
-        } else {
-            LOG_D("Failed to send message to LED queue");
-        }
         osDelay(500);
         HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_RESET);
         osDelay(500);
+        HAL_RTC_GetTime(&hrtc, &rtcTime, RTC_FORMAT_BIN);
+        HAL_RTC_GetDate(&hrtc, &rtcDate, RTC_FORMAT_BIN);
     }
   /* USER CODE END StartLED_Task */
 }
@@ -187,14 +166,13 @@ void StartLED_Task(void *argument)
 * @retval None
 */
 /* USER CODE END Header_StartWifi_Task */
-void StartWifi_Task(void *argument)
+void StartWifi_Task(void* argument)
 {
-  /* USER CODE BEGIN StartWifi_Task */
-      /* Infinite loop */
+    /* USER CODE BEGIN StartWifi_Task */
+          /* Infinite loop */
     char midStr[64] = "";
     // char midCmd[32] = "";
     uint16_t length = 0;
-    uint32_t ledLightNum = 0;
     for (;;) {
 #ifdef USE_USART2_NORMAL
         if (usart2_rx.finishFlag == 1) {
@@ -232,46 +210,101 @@ void StartWifi_Task(void *argument)
                         EspSendData("测试\r\n", sizeof("测试\r\n"));
                     }
                     else if (strstr(midStr, "[time]") != NULL) {
-                        HAL_RTC_GetTime(&hrtc, &rtcTime, RTC_FORMAT_BIN);
-                        HAL_RTC_GetDate(&hrtc, &rtcDate, RTC_FORMAT_BIN);
                         length = sprintf(midStr, "%02d/%02d/%02d%3d%3d:%2d:%2d\r\n", 2000 + rtcDate.Year, rtcDate.Month, rtcDate.Date, rtcDate.WeekDay, rtcTime.Hours, rtcTime.Minutes, rtcTime.Seconds);
                         EspSendData(midStr, length);
                     }
-                    else if (strstr(midStr, "[led]") != NULL)
-                    {
-                        if (osMessageQueueGet(myLEDQueueHandle, &ledLightNum, NULL, osWaitForever) == osOK) {
-                            length = sprintf(midStr, "ledlightNum:%ld\r\n", ledLightNum);
+                    else if (strstr(midStr, "[led]") != NULL) {
+                        length = sprintf(midStr, "ledlightNum:%ld\r\n", ledLightNum);
+                        EspSendData(midStr, length);
+                    }
+                    else if (strstr(midStr, "[sound]") != NULL) {
+                        USART3_Printf("<G>%c%c%c%c", 0xB2, 0xE2, 0xCA, 0xD4);
+                    }
+                    else if (strstr(midStr, "[key]") != NULL) {
+                        switch (midStr[5]) {
+                        case '1':
+                            HAL_GPIO_WritePin(GPIOB, GPIO_PIN_6, GPIO_PIN_SET == (midStr[6] - '0'));
+                            length = sprintf(midStr, "key[1]:OK\r\n");
                             EspSendData(midStr, length);
+                            break;
+                        case '2':
+                            HAL_GPIO_WritePin(GPIOB, GPIO_PIN_7, GPIO_PIN_SET == (midStr[6] - '0'));
+                            length = sprintf(midStr, "key[2]:OK\r\n");
+                            EspSendData(midStr, length);
+                            break;
+                        default:
+                            HAL_GPIO_WritePin(GPIOB, GPIO_PIN_6, GPIO_PIN_RESET);
+                            HAL_GPIO_WritePin(GPIOB, GPIO_PIN_7, GPIO_PIN_RESET);
+                            length = sprintf(midStr, "key all close\r\n");
+                            EspSendData(midStr, length);
+                            break;
                         }
                     }
-                    
+                    else if (strstr(midStr, "[v]") != NULL) {
+                        ADC1_GetValue();
+                        length = sprintf(midStr, "adc1IN9:%f\r\n", adc1dmaData.data[0]);
+                        EspSendData(midStr, length);
+                    }
+                    else if (strstr(midStr, "[p]") != NULL) {
+                        printf(">>GetVal\r\n");
+                        osDelay(10);
+                        if (usart1_rx.finishFlag == 1) {
+                            if (strstr((char*)usart1_rx.rxbuf, "OK") != NULL) {
+                                EspSendData((char*)usart1_rx.rxbuf, usart1_rx.rxBufLength);
+                            }
+                            usart1_rx.finishFlag = 0;
+                            usart1_rx.rxBufLength = 0;
+                        }
+                    }
                 }
             }
             usart2_dma.recvEndFlag = 0;
             usart2_dma.recvLength = 0;
         }
 #endif
+        osDelay(100);
+        ADC1_GetValue();
+        if (adc1dmaData.data[0] < 3.0) {
+            length = sprintf(midStr, "[blackout]\r\n");
+            EspSendData(midStr, length);
+        }
+        printf(">>GetVal\r\n");
+        osDelay(10);
+        if (usart1_rx.finishFlag == 1) {
+            // EspSendData((char*)usart1_rx.rxbuf, usart1_rx.rxBufLength);
+            if (strstr((char*)usart1_rx.rxbuf, "OK") != NULL) {
+                //  | Vrms:   0.00000V | Irms:   0.00000A | P:   0.0000W | PF: 0.00000 | F:  0.0000Hz | W:   0.0000KW*H |
+                // 使用 sscanf 提取字段值
+                char* midPData = strstr((char*)usart1_rx.rxbuf, "W |");
+                while (midPData[0] != ':') {
+                    midPData--;
+                }
+                if (midPData != NULL) {
+                    P= strtof(midPData + 1, NULL);
+                    // EspSendData("Power OK\r\n", sizeof("OK\r\n"));
+                    // EspSendData((char*)usart1_rx.rxbuf, usart1_rx.rxBufLength);
+                    // length = sprintf(midStr, "P:%f\r\n", P);
+                    // EspSendData(midStr, length);
+                    if (P > 1000.0) {
+                        length = sprintf(midStr, "P:%f\r\n", P);
+                        EspSendData(midStr, length);
+                        HAL_GPIO_WritePin(GPIOB, GPIO_PIN_6, GPIO_PIN_RESET);
+                        HAL_GPIO_WritePin(GPIOB, GPIO_PIN_7, GPIO_PIN_RESET);
+                        EspSendData("ALL CLOSE", sizeof("ALL CLOSE"));
+                        USART3_Printf("<G>%c%c%c%c%c%c%c%c",
+                            0xB9, 0xA6, // 功
+                            0xC2, 0xCA, // 率
+                            0xB9, 0xFD, // 过
+                            0xB8, 0xDF  // 高
+                        );
+                    }
+                }
+            }
+            usart1_rx.finishFlag = 0;
+            usart1_rx.rxBufLength = 0;
+        }
     }
-  /* USER CODE END StartWifi_Task */
-}
-
-/* USER CODE BEGIN Header_StartSound_Task */
-/**
-* @brief Function implementing the soundTask thread.
-* @param argument: Not used
-* @retval None
-*/
-/* USER CODE END Header_StartSound_Task */
-void StartSound_Task(void* argument)
-{
-    /* USER CODE BEGIN StartSound_Task */
-    /* Infinite loop */
-    
-    for (;;) {
-        osDelay(5000);
-        USART3_Printf("测试!\r\n");
-    }
-    /* USER CODE END StartSound_Task */
+    /* USER CODE END StartWifi_Task */
 }
 
 /* Private application code --------------------------------------------------*/
